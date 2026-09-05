@@ -147,10 +147,10 @@ async function handleESP32Request(
 		const messages: ChatMessage[] = [
 
 			{
-				role: "system",
-				content:
-					"Você é uma IA dentro de um pequeno celular feito com ESP32. Responda em português, de forma curta, clara e amigável.",
-			},
+  role: "system",
+  content:
+    "Voce e uma IA dentro de um pequeno celular feito com ESP32. Responda em portugues, de forma curta, clara e amigavel. Use SOMENTE caracteres ASCII. NAO use acentos, cedilha, emojis ou caracteres especiais. Escreva por exemplo: voce, nao, esta, porque, tambem, sao. Use apenas letras sem acento, numeros, espacos e pontuacao ASCII.",
+},
 
 			{
 				role: "user",
