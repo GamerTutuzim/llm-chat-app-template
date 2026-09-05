@@ -1,79 +1,131 @@
 /**
  * LLM Chat Application Template
  *
- * A simple chat application using Cloudflare Workers AI.
- * This template demonstrates how to implement an LLM-powered chat interface with
- * streaming responses using Server-Sent Events (SSE).
+ * Chat normal do site + API exclusiva para ESP32.
  *
  * @license MIT
  */
+
 import { Env, ChatMessage } from "./types";
 
-// Model ID for Workers AI model
-// https://developers.cloudflare.com/workers-ai/models/
-const MODEL_ID = "@cf/meta/llama-3.1-8b-instruct-fp8";
+// ======================================================
+// MODELO
+// ======================================================
 
-// Default system prompt
+const MODEL_ID =
+	"@cf/meta/llama-3.1-8b-instruct-fp8";
+
+// ======================================================
+// PROMPT DO SITE
+// ======================================================
+
 const SYSTEM_PROMPT =
 	"You are a helpful, friendly assistant. Provide concise and accurate responses.";
 
+// ======================================================
+// WORKER
+// ======================================================
+
 export default {
-	/**
-	 * Main request handler for the Worker
-	 */
 	async fetch(
 		request: Request,
 		env: Env,
 		ctx: ExecutionContext,
 	): Promise<Response> {
+
 		const url = new URL(request.url);
 
-		// Handle static assets (frontend)
-		if (url.pathname === "/" || !url.pathname.startsWith("/api/")) {
+		// --------------------------------------------------
+		// SITE
+		// --------------------------------------------------
+
+		if (
+			url.pathname === "/" ||
+			!url.pathname.startsWith("/api/")
+		) {
 			return env.ASSETS.fetch(request);
 		}
 
-        // API exclusiva para o ESP32
-if (url.pathname === "/api/esp32") {
-	if (request.method !== "POST") {
-		return new Response("Method not allowed", { status: 405 });
-	}
+		// --------------------------------------------------
+		// API DO ESP32
+		// --------------------------------------------------
 
-	return handleESP32Request(request, env);
-}
-		
-		// API Routes
-		if (url.pathname === "/api/chat") {
-			// Handle POST requests for chat
-			if (request.method === "POST") {
-				return handleChatRequest(request, env);
+		if (url.pathname === "/api/esp32") {
+
+			if (request.method !== "POST") {
+
+				return new Response(
+					"Method not allowed",
+					{ status: 405 },
+				);
 			}
 
-			// Method not allowed for other request types
-			return new Response("Method not allowed", { status: 405 });
+			return handleESP32Request(
+				request,
+				env,
+			);
 		}
 
-		// Handle 404 for unmatched routes
-		return new Response("Not found", { status: 404 });
+		// --------------------------------------------------
+		// API DO SITE
+		// --------------------------------------------------
+
+		if (url.pathname === "/api/chat") {
+
+			if (request.method === "POST") {
+
+				return handleChatRequest(
+					request,
+					env,
+				);
+			}
+
+			return new Response(
+				"Method not allowed",
+				{ status: 405 },
+			);
+		}
+
+		// --------------------------------------------------
+		// 404
+		// --------------------------------------------------
+
+		return new Response(
+			"Not found",
+			{ status: 404 },
+		);
 	},
 } satisfies ExportedHandler<Env>;
 
-/**
- * Handles chat API requests
- */
-/**
- * API simples para o ESP32
- */
+// ======================================================
+// API ESP32
+// ======================================================
+
 async function handleESP32Request(
 	request: Request,
 	env: Env,
 ): Promise<Response> {
-	try {
-		const { mensagem } = (await request.json()) as {
-			mensagem?: string;
-		};
 
-		if (!mensagem || mensagem.trim() === "") {
+	try {
+
+		// --------------------------------------------------
+		// LER JSON
+		// --------------------------------------------------
+
+		const body =
+			(await request.json()) as {
+				mensagem?: string;
+			};
+
+		const mensagem =
+			body.mensagem?.trim();
+
+		// --------------------------------------------------
+		// VALIDAR MENSAGEM
+		// --------------------------------------------------
+
+		if (!mensagem) {
+
 			return new Response(
 				JSON.stringify({
 					error: "Mensagem vazia",
@@ -81,52 +133,81 @@ async function handleESP32Request(
 				{
 					status: 400,
 					headers: {
-						"content-type": "application/json",
+						"content-type":
+							"application/json; charset=utf-8",
 					},
 				},
 			);
 		}
 
+		// --------------------------------------------------
+		// MENSAGENS
+		// --------------------------------------------------
+
 		const messages: ChatMessage[] = [
+
 			{
 				role: "system",
 				content:
-					"Você é um assistente de IA rodando em um pequeno dispositivo ESP32. Responda de forma curta, clara e amigável.",
+					"Você é uma IA dentro de um pequeno celular feito com ESP32. Responda em português, de forma curta, clara e amigável.",
 			},
+
 			{
 				role: "user",
 				content: mensagem,
 			},
 		];
 
-		const inputs = {
-			messages,
-			max_tokens: 256,
-			stream: false,
-		} satisfies AiTextGenerationInput & { stream: false };
+		// --------------------------------------------------
+		// ENTRADA DO MODELO
+		// --------------------------------------------------
 
-		const resposta = await env.AI.run<typeof MODEL_ID>(
-			MODEL_ID,
-			inputs,
-		);
+		const inputs = {
+
+			messages,
+
+			max_tokens: 256,
+
+			stream: false,
+
+		} satisfies
+			AiTextGenerationInput & {
+				stream: false;
+			};
+
+		// --------------------------------------------------
+		// CHAMAR IA
+		// --------------------------------------------------
+
+		const resposta =
+			await env.AI.run<
+				typeof MODEL_ID
+			>(
+				MODEL_ID,
+				inputs,
+			);
+
+		// --------------------------------------------------
+		// RETORNAR RESPOSTA
+		// --------------------------------------------------
 
 		return new Response(
 			JSON.stringify({
 				resposta:
-					typeof resposta === "object" &&
-					resposta !== null &&
-					"response" in resposta
-						? resposta.response
-						: String(resposta),
+					resposta.response,
 			}),
 			{
 				status: 200,
+
 				headers: {
-					"content-type": "application/json",
+					"content-type":
+						"application/json; charset=utf-8",
 				},
 			},
 		);
+
 	} catch (error) {
+
 		console.error(
 			"Erro na API do ESP32:",
 			error,
@@ -134,61 +215,122 @@ async function handleESP32Request(
 
 		return new Response(
 			JSON.stringify({
-				error: "Falha ao processar a mensagem",
+				error:
+					error instanceof Error
+						? error.message
+						: String(error),
 			}),
 			{
 				status: 500,
+
 				headers: {
-					"content-type": "application/json",
+					"content-type":
+						"application/json; charset=utf-8",
 				},
 			},
 		);
 	}
 }
+
+// ======================================================
+// API DO SITE
+// ======================================================
+
 async function handleChatRequest(
 	request: Request,
 	env: Env,
 ): Promise<Response> {
-	try {
-		// Parse JSON request body
-		const { messages = [] } = (await request.json()) as {
-			messages: ChatMessage[];
-		};
 
-		// Add system prompt if not present
-		if (!messages.some((msg) => msg.role === "system")) {
-			messages.unshift({ role: "system", content: SYSTEM_PROMPT });
+	try {
+
+		const {
+			messages = [],
+		} =
+			(await request.json()) as {
+				messages: ChatMessage[];
+			};
+
+		// ------------------------------------------------
+		// SYSTEM PROMPT
+		// ------------------------------------------------
+
+		if (
+			!messages.some(
+				(msg) =>
+					msg.role === "system",
+			)
+		) {
+
+			messages.unshift({
+				role: "system",
+				content: SYSTEM_PROMPT,
+			});
 		}
 
+		// ------------------------------------------------
+		// ENTRADA
+		// ------------------------------------------------
+
 		const inputs = {
+
 			messages,
+
 			max_tokens: 1024,
+
 			stream: true,
-		} satisfies AiTextGenerationInput & { stream: true };
 
-		const stream = await env.AI.run<typeof MODEL_ID>(MODEL_ID, inputs, {
-			// Uncomment to use AI Gateway
-			// gateway: {
-			//   id: "YOUR_GATEWAY_ID", // Replace with your AI Gateway ID
-			//   skipCache: false,      // Set to true to bypass cache
-			//   cacheTtl: 3600,        // Cache time-to-live in seconds
-			// },
-		});
+		} satisfies
+			AiTextGenerationInput & {
+				stream: true;
+			};
 
-		return new Response(stream, {
-			headers: {
-				"content-type": "text/event-stream; charset=utf-8",
-				"cache-control": "no-cache",
-				connection: "keep-alive",
-			},
-		});
-	} catch (error) {
-		console.error("Error processing chat request:", error);
+		// ------------------------------------------------
+		// STREAM
+		// ------------------------------------------------
+
+		const stream =
+			await env.AI.run<
+				typeof MODEL_ID
+			>(
+				MODEL_ID,
+				inputs,
+			);
+
 		return new Response(
-			JSON.stringify({ error: "Failed to process request" }),
+			stream,
+			{
+				headers: {
+					"content-type":
+						"text/event-stream; charset=utf-8",
+
+					"cache-control":
+						"no-cache",
+
+					connection:
+						"keep-alive",
+				},
+			},
+		);
+
+	} catch (error) {
+
+		console.error(
+			"Error processing chat request:",
+			error,
+		);
+
+		return new Response(
+			JSON.stringify({
+				error:
+					"Failed to process request",
+			}),
 			{
 				status: 500,
-				headers: { "content-type": "application/json" },
+
+				headers: {
+					"content-type":
+						"application/json",
+				},
 			},
 		);
 	}
