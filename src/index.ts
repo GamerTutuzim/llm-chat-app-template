@@ -33,6 +33,15 @@ export default {
 			return env.ASSETS.fetch(request);
 		}
 
+        // API exclusiva para o ESP32
+if (url.pathname === "/api/esp32") {
+	if (request.method !== "POST") {
+		return new Response("Method not allowed", { status: 405 });
+	}
+
+	return handleESP32Request(request, env);
+}
+		
 		// API Routes
 		if (url.pathname === "/api/chat") {
 			// Handle POST requests for chat
@@ -52,6 +61,90 @@ export default {
 /**
  * Handles chat API requests
  */
+/**
+ * API simples para o ESP32
+ */
+async function handleESP32Request(
+	request: Request,
+	env: Env,
+): Promise<Response> {
+	try {
+		const { mensagem } = (await request.json()) as {
+			mensagem?: string;
+		};
+
+		if (!mensagem || mensagem.trim() === "") {
+			return new Response(
+				JSON.stringify({
+					error: "Mensagem vazia",
+				}),
+				{
+					status: 400,
+					headers: {
+						"content-type": "application/json",
+					},
+				},
+			);
+		}
+
+		const messages: ChatMessage[] = [
+			{
+				role: "system",
+				content:
+					"Você é um assistente de IA rodando em um pequeno dispositivo ESP32. Responda de forma curta, clara e amigável.",
+			},
+			{
+				role: "user",
+				content: mensagem,
+			},
+		];
+
+		const inputs = {
+			messages,
+			max_tokens: 256,
+			stream: false,
+		} satisfies AiTextGenerationInput & { stream: false };
+
+		const resposta = await env.AI.run<typeof MODEL_ID>(
+			MODEL_ID,
+			inputs,
+		);
+
+		return new Response(
+			JSON.stringify({
+				resposta:
+					typeof resposta === "object" &&
+					resposta !== null &&
+					"response" in resposta
+						? resposta.response
+						: String(resposta),
+			}),
+			{
+				status: 200,
+				headers: {
+					"content-type": "application/json",
+				},
+			},
+		);
+	} catch (error) {
+		console.error(
+			"Erro na API do ESP32:",
+			error,
+		);
+
+		return new Response(
+			JSON.stringify({
+				error: "Falha ao processar a mensagem",
+			}),
+			{
+				status: 500,
+				headers: {
+					"content-type": "application/json",
+				},
+			},
+		);
+	}
+}
 async function handleChatRequest(
 	request: Request,
 	env: Env,
